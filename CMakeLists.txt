@@ -6,15 +6,26 @@ enable_testing()
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
-add_executable(VideoConverter main.cpp)
-target_link_libraries(VideoConverter PUBLIC IMGUI)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libs/glfw/include)
+
+set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui)
+set(IMGUI_SOURCES ${IMGUI_DIR}/imgui.cpp ${IMGUI_DIR}/imgui_demo.cpp ${IMGUI_DIR}/imgui_draw.cpp ${IMGUI_DIR}/imgui_tables.cpp ${IMGUI_DIR}/imgui_widgets.cpp ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp)
+
+set(LIBS IMGUI ${CMAKE_CURRENT_SOURCE_DIR}/libs/glfw/lib-vc2010-64/glfw3.lib)
+
+add_executable(VideoConverter main.cpp ${IMGUI_SOURCES})
+target_link_libraries(VideoConverter PUBLIC ${LIBS})
+
+if(UNIX)
+    target_link_libraries(VideoConverter PUBLIC pthread)
+endif()
 
 add_subdirectory("libs")
 if(BUILD_EXAMPLES)
         add_subdirectory("examples")
 endif()
 
-install(TARGETS VideoConverter DESTINATION vidconv)
+install(TARGETS VideoConverter DESTINATION .)
 
 include(InstallRequiredSystemLibraries)
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})

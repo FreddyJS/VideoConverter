@@ -3,10 +3,15 @@
 // If you are new to Dear ImGui, read documentation from the docs/ folder + read the top of imgui.cpp.
 // Read online: https://github.com/ocornut/imgui/tree/master/docs
 
+#include <iostream>
+#include <stdio.h>
+
+#include "LinkedList.hpp"
+
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
-#include <stdio.h>
+#include "SDL.h"
 
 #if defined(IMGUI_IMPL_OPENGL_ES2)
 #include <GLES2/gl2.h>
@@ -46,9 +51,56 @@ using namespace gl;
 #pragma comment(lib, "legacy_stdio_definitions")
 #endif
 
+struct files
+{
+    std::string name;
+    std::string path;
+    std::string format;
+};
+
+LinkedList<files>* fileList = new LinkedList<files>();
+
 static void glfw_error_callback(int error, const char* description)
 {
-    fprintf(stderr, "Glfw Error %d: %s\n", error, description);
+    fprintf(stderr, "glfw error %d: %s\n", error, description);
+}
+
+void debug_list()
+{
+    std::cout << "\n----- LIST DEBUG -----\n";
+    std::cout << "Current: " << fileList->current << " - Items: " << fileList->size << std::endl;
+    for(int i = 0; i < fileList->size; i++)
+    {
+        std::cout << "Ptr: " << fileList->getItemPtr(i) << " - Name: " << fileList->get(i).name << " - Ext: " << fileList->get(i).format << std::endl;
+    }
+    std::cout << "----- END DEBUG -----\n\n";
+}
+
+void drop_callback(GLFWwindow* window, int count, const char** paths)
+{
+    int i;
+    for (i = 0;  i < count;  i++)
+    {
+        struct files droped;
+        std::string file(paths[i]);
+        droped.path = file;
+        
+        droped.name = droped.path.substr(droped.path.find_last_of("/\\") + 1);
+
+        size_t i = droped.path.rfind('.', droped.path.length());
+        if (i != std::string::npos) {
+            droped.format = droped.path.substr(i+1, droped.path.length() - i);
+        }
+
+        std::cout << "Dropped File: " << droped.path << " - " << droped.name << " - " << droped.format << "\n";
+
+        if (droped.format != "mov" && droped.format != "mp4")
+        {
+            std::cout << "Not supported file: " << droped.name << std::endl;
+            return;
+        }
+        fileList->addLast(droped);
+    }
 }
 
 int main(int, char**)
@@ -82,10 +134,11 @@ int main(int, char**)
 #endif
 
     // Create window with graphics context
-    GLFWwindow* window = glfwCreateWindow(1280, 720, "Dear ImGui GLFW+OpenGL3 example", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(1280, 720, "VidConverter ImGUI GLFW+OpenGL3", NULL, NULL);
     if (window == NULL)
         return 1;
     glfwMakeContextCurrent(window);
+    glfwSetDropCallback(window, drop_callback);
     glfwSwapInterval(1); // Enable vsync
 
     // Initialize OpenGL loader
@@ -113,14 +166,18 @@ int main(int, char**)
     }
 
     // Setup Dear ImGui context
+    std::cout << "Starting ImGUI\n";
+
     IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
+    ImGuiContext* imguictx = ImGui::CreateContext();
+    std::cout << "Created imgui context " << imguictx << std::endl;
+
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
     // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
+    ImGui::StyleColorsLight();
     //ImGui::StyleColorsClassic();
 
     // Setup Platform/Renderer backends
@@ -143,11 +200,10 @@ int main(int, char**)
     //IM_ASSERT(font != NULL);
 
     // Our state
-    bool show_demo_window = true;
-    bool show_another_window = false;
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    bool dark_mode = false;
+    ImVec4 bgcolor = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    const ImGuiViewport* main_viewport = ImGui::GetMainViewport();
 
-    // Main loop
     while (!glfwWindowShouldClose(window))
     {
         // Poll and handle events (inputs, window resize, etc.)
@@ -162,49 +218,63 @@ int main(int, char**)
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-        if (show_demo_window)
-            ImGui::ShowDemoWindow(&show_demo_window);
+        ImGui::ShowDemoWindow();
 
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
+        // Detect droped files to convert
+        if (fileList->size) 
         {
-            static float f = 0.0f;
-            static int counter = 0;
+            //std::cout << fileList->getFirst().path << std::endl;
+            ImVec2 wpos = main_viewport->GetCenter();
+            wpos.x -= main_viewport->Size.x/4;
+            wpos.y -= main_viewport->Size.y/4;
 
-            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-
-            ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-            ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-            ImGui::Checkbox("Another Window", &show_another_window);
-
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-
-            if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
-
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+            ImVec2 wsize = main_viewport->WorkSize;
+            wsize.x = wsize.x/2; wsize.y = wsize.y/2;
+            
+            ImGui::SetNextWindowPos(wpos, ImGuiCond_Always);
+            ImGui::SetNextWindowSize(wsize, ImGuiCond_Always);            
+            
+            ImGui::Begin("Convert Window");
+            ImGui::Text("Here is the file info: %s, total files: %i", fileList->getFirst().name.c_str(), fileList->size);
+            if(ImGui::Button("Convert"))
+            {
+                std::cout << "Converting file: " << fileList->getFirst().path << std::endl;
+                fileList->remove(0);
+            }
             ImGui::End();
         }
+        
+        if(dark_mode)
+            ImGui::StyleColorsDark();
+        else
+            ImGui::StyleColorsLight();
 
-        // 3. Show another simple window.
-        if (show_another_window)
-        {
-            ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-            ImGui::Text("Hello from another window!");
-            if (ImGui::Button("Close Me"))
-                show_another_window = false;
-            ImGui::End();
-        }
+        // Create a window
+        // Set window pos and size
+        ImGui::SetNextWindowPos(ImVec2(0,0), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(main_viewport->WorkSize, ImGuiCond_Always);
+        
+        // Some window flags no resize
+        ImGuiWindowFlags window_flags = 0;
+        window_flags |= ImGuiWindowFlags_NoResize;
+        //window_flags |= ImGuiWindowFlags_NoCollapse;
+
+        ImGui::Begin("Main Window Fullscreen", NULL, window_flags);                 // Create a window called "Hello, world!" and append into it.
+
+        ImGui::Text("This is a video converter program, drag and drop any file to convert :)");               // Display some text (you can use a format strings too)
+        ImGui::Checkbox("Dark Mode", &dark_mode);      // Edit bools storing our window open/close state
+
+        ImGui::ColorEdit3("Background Color", (float*)&bgcolor); // Edit 3 floats representing a color
+
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+        ImGui::End();
 
         // Rendering
         ImGui::Render();
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
-        glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+        glClearColor(bgcolor.x * bgcolor.w, bgcolor.y * bgcolor.w, bgcolor.z * bgcolor.w, bgcolor.w);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 

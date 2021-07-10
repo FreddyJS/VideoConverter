@@ -1,0 +1,1 @@
+%~dp0/build/_CPack_Packages/win64/NSIS/VideoConverter-0.1.1-win64/VideoConverter/bin/VideoConverter.exe

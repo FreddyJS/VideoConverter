@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <Windows.h>
 
 struct vidFile
 {
@@ -10,8 +11,9 @@ struct vidFile
 };
 
 bool fileExists(const std::string& path);
-
 void fillFileInfo(vidFile* file, const std::string& path);
+void convertFileTo(vidFile toConvert, std::string format, std::string ffmpegFile);
+
 std::string getNameFromPath(const std::string& path);
 std::string getExtFromPath(const std::string& path);
 std::string getFolderFromPath(const std::string& path);

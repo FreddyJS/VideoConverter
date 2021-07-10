@@ -19,6 +19,15 @@ void fillFileInfo(vidFile* file, const std::string& path)
     file->format = getExtFromPath(path);
 }
 
+void convertFileTo(vidFile toConvert, std::string format, std::string ffmpegFile)
+{
+    std::string outfile = changeFileExtension(toConvert.path, "mp4");
+    std::string command = ffmpegFile + " -i " + toConvert.path + " -vcodec copy -acodec copy -y " + outfile;// + " >nul 2>nul";
+    
+    std::cout << "Converting file: " << toConvert.name << "... [" << outfile << "]" << std::endl;
+    WinExec(command.c_str(), SW_HIDE);
+    //system(command.c_str());
+}
 
 std::string getNameFromPath(const std::string& path)
 {

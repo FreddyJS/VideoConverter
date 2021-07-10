@@ -6,14 +6,10 @@
 #include <iostream>
 #include <stdio.h>
 
-#include "LinkedList.hpp"
-#include "files.h"
-
-#include "stb_image.h"
-#include "imgui.h"
-#include "imgui_impl_glfw.h"
-#include "imgui_impl_opengl3.h"
-#include "SDL.h"
+#include <imgui_impl_opengl3.h>
+#include <imgui_impl_glfw.h>
+#include <imgui.h>
+#include <SDL.h>
 
 #if defined(IMGUI_IMPL_OPENGL_ES2)
 #include <GLES2/gl2.h>
@@ -54,42 +50,12 @@ using namespace gl;
 #endif
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include <images.h>
 
-// Simple helper function to load an image into a OpenGL texture with common settings
-bool LoadTextureFromFile(const char* filename, GLuint* out_texture, int* out_width, int* out_height)
-{
-    // Load from file
-    int image_width = 0;
-    int image_height = 0;
-    unsigned char* image_data = stbi_load(filename, &image_width, &image_height, NULL, 4);
-    if (image_data == NULL)
-        return false;
-
-    // Create a OpenGL texture identifier
-    GLuint image_texture;
-    glGenTextures(1, &image_texture);
-    glBindTexture(GL_TEXTURE_2D, image_texture);
-
-    // Setup filtering parameters for display
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
-
-    // Upload pixels into texture
-#if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-#endif
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_width, image_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
-    stbi_image_free(image_data);
-
-    *out_texture = image_texture;
-    *out_width = image_width;
-    *out_height = image_height;
-
-    return true;
-}
+// Here we add our includes
+#include <vcwindows.h>
+#include <LinkedList.hpp>
+#include <files.h>
 
 LinkedList<vidFile>* fileList = new LinkedList<vidFile>();
 
@@ -130,9 +96,20 @@ void drop_callback(GLFWwindow* window, int count, const char** paths)
     }
 }
 
-#pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
+std::string getInstallationPath(char* path)
+{
+    std::string launchPath(path);
+    std::string install_dir = getFolderFromPath(launchPath);
+    install_dir = install_dir.substr(0, install_dir.length() -1);
 
-int main(int, char**)
+    return getFolderFromPath(install_dir.c_str());
+}
+
+#ifndef DEBUG_MODE
+#pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
+#endif
+
+int main(int argc, char** argv)
 {
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
@@ -196,7 +173,8 @@ int main(int, char**)
     }
 
     // Setup Dear ImGui context
-    std::cout << "Starting ImGUI\n";
+    std::string installDir = getInstallationPath(argv[0]);
+    std::cout << "\n---- VideoConverter v0.1.0 Initialized ----\n" << "Installation Directory: " << installDir << std::endl;
 
     IMGUI_CHECKVERSION();
     ImGuiContext* imguictx = ImGui::CreateContext();
@@ -213,7 +191,7 @@ int main(int, char**)
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
-
+    
     // Load Fonts
     // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
     // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
@@ -237,9 +215,16 @@ int main(int, char**)
     int my_image_width = 0;
     int my_image_height = 0;
     GLuint my_image_texture = 0;
-    bool ret = LoadTextureFromFile("C:\\Dev\\VideoConverter\\background.jpg", &my_image_texture, &my_image_width, &my_image_height);
+
+    std::string bgfile = installDir + "res/background.jpg";
+    std::string ffmpegFile = "\"" + installDir + "res/ffmpeg.exe\"";
+    bool ret = LoadTextureFromFile(bgfile.c_str(), &my_image_texture, &my_image_width, &my_image_height);
     IM_ASSERT(ret);
-    
+
+    ShowWindow(::GetConsoleWindow(), SW_HIDE);
+
+    static ImVec2 lastWindowSize(0.f, 0.f);
+
     while (!glfwWindowShouldClose(window))
     {
         // Poll and handle events (inputs, window resize, etc.)
@@ -253,104 +238,21 @@ int main(int, char**)
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-
-        // Background window!
-
-        // Set the window position
-        ImGui::SetNextWindowPos(ImVec2(0,0), ImGuiCond_Always);
-        ImGui::SetNextWindowSize(main_viewport->WorkSize, ImGuiCond_Always);
-        // Set the window to be transparent
-        ImGui::SetNextWindowBgAlpha(0);
-
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-        // Set the window to no border
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
-
-        ImGui::Begin("Background Window", NULL, ImGuiWindowFlags_NoMove |
-                 ImGuiWindowFlags_NoTitleBar |
-                 ImGuiWindowFlags_NoBringToFrontOnFocus |
-                 ImGuiWindowFlags_NoInputs |
-                 ImGuiWindowFlags_NoCollapse |
-                 ImGuiWindowFlags_NoResize |
-                 ImGuiWindowFlags_NoScrollbar);
-
-        ImGui::Image((void*)(intptr_t)my_image_texture, ImGui::GetContentRegionAvail());
-        ImGui::End();
-
-        ImGui::PopStyleVar(2);
         
-        // Detect droped files to convert
-        if (fileList->size) 
-        {
-            //std::cout << fileList->getFirst().path << std::endl;
-            ImVec2 wpos = main_viewport->GetCenter();
-            wpos.x -= main_viewport->Size.x/3;
-            wpos.y -= main_viewport->Size.y/3;
-
-            ImVec2 wsize = main_viewport->WorkSize;
-            wsize.x = wsize.x/1.5; wsize.y = wsize.y/1.5;
-
-            struct vidFile toConvert = fileList->getFirst();
-            
-            //ImGui::SetNextWindowPos(wpos, ImGuiCond_Always);
-            //ImGui::SetNextWindowSize(wsize, ImGuiCond_Always);            
-            
-            ImGuiWindowFlags window_flags = 0;
-            window_flags |= ImGuiWindowFlags_NoResize;
-            window_flags |= ImGuiWindowFlags_NoCollapse;
-            window_flags |= ImGuiWindowFlags_NoMove;
-
-            ImGui::Begin("Convert Window", NULL, window_flags);
-            
-            ImGui::Text("Total Files: %i", fileList->size);
-            ImGui::Text("File Name: %s", toConvert.name.c_str());
-            ImGui::Text("File Format: %s", toConvert.format.c_str());
-
-            if(ImGui::Button("Convert to MP4"))
-            {
-
-                if (toConvert.format == "mov") {
-                    std::string outfile = changeFileExtension(toConvert.path, "mp4");
-                    std::string command = "ffmpeg.exe -i " + toConvert.path + " -vcodec copy -acodec copy " + outfile + ">nul 2>nul";
-                 
-                    if (!fileExists(outfile)) {
-                        std::cout << "Converting file: " << toConvert.name << "... [" << outfile << "]" << std::endl;
-                        system(command.c_str());
-                    } else {
-                        std::cout << "Outfile already exists... Skipping!";
-                    }                                              
-                }
-                fileList->remove(0);
-            }
-            ImGui::End();
-        }
-        
+        // Switch theme mode
         if(dark_mode)
             ImGui::StyleColorsDark();
         else
             ImGui::StyleColorsLight();
 
-        // Create a window
-        // Set window pos and size
-        ImVec2 size = main_viewport->WorkSize;
-        size.y /= 4;
-
-        ImGui::SetNextWindowSize(size, ImGuiCond_Always);
-        ImGui::SetNextWindowPos(ImVec2(0,0), ImGuiCond_Always);
+        if (fileList->size) 
+        {
+            VidConv::showConvertWindow(fileList, ffmpegFile);
+        }
         
-        // Some window flags no resize
-        ImGuiWindowFlags window_flags = 0;
-        window_flags |= ImGuiWindowFlags_NoResize;
-        window_flags |= ImGuiWindowFlags_NoCollapse;
-        window_flags |= ImGuiWindowFlags_NoTitleBar;
 
-        ImGui::Begin("Configuration Window", NULL, window_flags);                 // Create a window called "Hello, world!" and append into it.
-
-        ImGui::Text("This is a video converter program, drag and drop any file to convert it :)");               // Display some text (you can use a format strings too)
-        ImGui::Checkbox("Dark Mode", &dark_mode);      // Edit bools storing our window open/close state
-
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-        ImGui::End();
+        VidConv::showInfoWindow(&dark_mode);
+        VidConv::showBackgroundWindow(my_image_texture);
 
         // Rendering
         ImGui::Render();
@@ -371,6 +273,8 @@ int main(int, char**)
 
     glfwDestroyWindow(window);
     glfwTerminate();
+
+    delete(fileList);
 
     return 0;
 }

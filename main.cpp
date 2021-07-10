@@ -50,12 +50,12 @@ using namespace gl;
 #endif
 
 #define STB_IMAGE_IMPLEMENTATION
-#include <images.h>
+#include <images.hpp>
 
 // Here we add our includes
-#include <vcwindows.h>
+#include <vcwindows.hpp>
 #include <LinkedList.hpp>
-#include <files.h>
+#include <files.hpp>
 
 LinkedList<vidFile>* fileList = new LinkedList<vidFile>();
 

@@ -1,4 +1,4 @@
-#include "files.h"
+#include "files.hpp"
 
 bool fileExists(const std::string& path)
 {

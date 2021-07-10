@@ -1,4 +1,4 @@
-#include <vcwindows.h>
+#include <vcwindows.hpp>
 
 static ImVec2 lastWindowSize(0.f, 0.f);
 
@@ -17,7 +17,7 @@ void VidConv::showInfoWindow(bool* dark_mode)
     // Info window
     // Set window pos and size
     ImVec2 size = ImGui::GetMainViewport()->WorkSize;
-    size.y /= 4;
+    size.y = 0;
         
     ImGui::SetNextWindowSize(size, ImGuiCond_Always);
     ImGui::SetNextWindowPos(ImVec2(0,0), ImGuiCond_Always);

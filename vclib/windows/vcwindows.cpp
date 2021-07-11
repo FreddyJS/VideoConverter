@@ -21,6 +21,7 @@ void VidConv::showInfoWindow(bool* dark_mode)
         
     ImGui::SetNextWindowSize(size, ImGuiCond_Always);
     ImGui::SetNextWindowPos(ImVec2(0,0), ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.8f);
         
     // Some window flags no resize
     ImGuiWindowFlags window_flags = 0;

@@ -11,7 +11,7 @@ set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME VideoConverter)
 add_subdirectory("libs")
 
 # ----- SET INCLUDE DIRS -----#
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libs/glfw/include ${CMAKE_CURRENT_SOURCE_DIR}/libs/LinkedList ${CMAKE_CURRENT_SOURCE_DIR}/vclib/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libs/glfw/include ${CMAKE_CURRENT_SOURCE_DIR}/libs/LinkedList ${CMAKE_CURRENT_SOURCE_DIR}/vclib/include ${CMAKE_CURRENT_SOURCE_DIR}/libs/libav/include)
 
 # ----- SET UP IMGUI LIB -----#
 set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui)
@@ -19,11 +19,19 @@ set(IMGUI_SOURCES ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp ${IMGUI_DIR}/backend
 
 set(LIBS IMGUI ${CMAKE_CURRENT_SOURCE_DIR}/libs/glfw/lib-vc2010-64/glfw3.lib)
 
-
 # ----- SET UP FFMPEG EXE -----#
 set(FFMPEG_EXE ${CMAKE_SOURCE_DIR}/libs/ffmpeg/ffmpeg.exe)
 add_executable(FFMPEG IMPORTED)
 
+set(LIBAV_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs/libav)
+set(LIBAV ${LIBAV}
+    ${LIBAV_DIR}/avcodec.lib
+    ${LIBAV_DIR}/avdevice.lib
+    ${LIBAV_DIR}/avfilter.lib
+    ${LIBAV_DIR}/avformat.lib
+    ${LIBAV_DIR}/avresample.lib
+    ${LIBAV_DIR}/avutil.lib
+)
 
 # ----- VIDCONVERTER -----#
 set(SOURCES ${SOURCES} 
@@ -31,29 +39,30 @@ set(SOURCES ${SOURCES}
     vclib/files/files.cpp
     vclib/files/images.cpp
     vclib/windows/vcwindows.cpp
+    vclib/libav_backend/libav_impl.cpp
+    vclib/include/libav_impl.hpp
     main.cpp
 )
 
 add_executable(VideoConverter ${SOURCES})
 
 set(PCH_HEADERS 
-<Windows.h>
-<GL/gl3w.h>
-<GLFW/glfw3.h>
-<iostream>
-<SDL.h>
+    <Windows.h>
+    <GL/gl3w.h>
+    <GLFW/glfw3.h>
+    <iostream>
+    <SDL.h>
 )
 
 # DEBUG_MODE?
-#target_compile_definitions(VideoConverter PRIVATE DEBUG_MODE=1)
+target_compile_definitions(VideoConverter PRIVATE DEBUG_MODE=1)
 
 target_precompile_headers(VideoConverter PRIVATE ${PCH_HEADERS})
-target_link_libraries(VideoConverter PUBLIC ${LIBS})
+target_link_libraries(VideoConverter PUBLIC ${LIBS} ${LIBAV})
 
 if(UNIX)
     target_link_libraries(VideoConverter PUBLIC pthread)
 endif()
-
 
 # ----- RULES FOR CPACK -----#
 install(FILES ${FFMPEG_EXE} DESTINATION res)

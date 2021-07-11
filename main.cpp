@@ -57,6 +57,8 @@ using namespace gl;
 #include <LinkedList.hpp>
 #include <files.hpp>
 
+#include <libav_impl.hpp>
+
 LinkedList<vidFile>* fileList = new LinkedList<vidFile>();
 
 static void glfw_error_callback(int error, const char* description)
@@ -85,6 +87,8 @@ void drop_callback(GLFWwindow* window, int count, const char** paths)
 
         fillFileInfo(&droped, file);
         std::cout << "Dropped File: " << droped.path << " - " << droped.name << " - " << droped.format << "\n";
+        
+        VidConv::showVideoInfo(file.c_str());
 
         if (droped.format != "mov" && droped.format != "mp4")
         {
@@ -108,6 +112,10 @@ std::string getInstallationPath(char* path)
 #ifndef DEBUG_MODE
 #pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
 #endif
+
+extern "C" {
+    #include <libavcodec/avcodec.h>
+}
 
 int main(int argc, char** argv)
 {
@@ -221,7 +229,8 @@ int main(int argc, char** argv)
     bool ret = LoadTextureFromFile(bgfile.c_str(), &my_image_texture, &my_image_width, &my_image_height);
     IM_ASSERT(ret);
 
-    ShowWindow(::GetConsoleWindow(), SW_HIDE);
+    //Hide the console
+    //ShowWindow(::GetConsoleWindow(), SW_HIDE);
 
     static ImVec2 lastWindowSize(0.f, 0.f);
 
@@ -250,7 +259,6 @@ int main(int argc, char** argv)
             VidConv::showConvertWindow(fileList, ffmpegFile);
         }
         
-
         VidConv::showInfoWindow(&dark_mode);
         VidConv::showBackgroundWindow(my_image_texture);
 

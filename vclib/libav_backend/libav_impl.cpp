@@ -14,9 +14,6 @@ void VidConv::showVideoInfo(const char *input)
 {
     libavlog("Registering all codecs");
     // Setup LibAv
-    avcodec_register_all();
-    av_register_all();
-
 
     AVFormatContext *pFormatContext = avformat_alloc_context();
     if (!pFormatContext) {
@@ -39,12 +36,15 @@ void VidConv::showVideoInfo(const char *input)
         return;
     }
 
-    AVCodec *pCodec = NULL;
+    const AVCodec *pCodec = NULL;
     int video_stream_index = -1;
 
     // loop though all the streams and print its main information
     for (int i = 0; i < pFormatContext->nb_streams; i++)
     {
+        AVCodecParameters *pLocalCodecParameters =  NULL;
+        pLocalCodecParameters = pFormatContext->streams[i]->codecpar;
+
         libavlog("AVStream->time_base before open coded %d/%d", pFormatContext->streams[i]->time_base.num, pFormatContext->streams[i]->time_base.den);
         libavlog("AVStream->r_frame_rate before open coded %d/%d", pFormatContext->streams[i]->avg_frame_rate.num, pFormatContext->streams[i]->avg_frame_rate.den);
         libavlog("AVStream->start_time %lld", pFormatContext->streams[i]->start_time);
@@ -52,10 +52,10 @@ void VidConv::showVideoInfo(const char *input)
 
         libavlog("Finding the proper decoder (CODEC)");
 
-        AVCodec *pLocalCodec = NULL;
+        const AVCodec *pLocalCodec = NULL;
 
         // finds the registered decoder for a codec ID
-        pLocalCodec = avcodec_find_decoder(pFormatContext->streams[i]->codec->codec_id);
+        pLocalCodec = avcodec_find_decoder(pLocalCodecParameters->codec_id);
 
         if (pLocalCodec==NULL) {
             libavlog("ERROR unsupported codec!");
@@ -64,19 +64,19 @@ void VidConv::showVideoInfo(const char *input)
         }
 
         // when the stream is a video we store its index, codec parameters and codec
-        if (pFormatContext->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO) {
+        if (pLocalCodecParameters->codec_type == AVMEDIA_TYPE_VIDEO) {
             if (video_stream_index == -1) {
                 video_stream_index = i;
                 pCodec = pLocalCodec;
             }
 
-            libavlog("Video Codec: resolution %d x %d", pFormatContext->streams[i]->codec->width, pFormatContext->streams[i]->codec->height);
-        } else if (pFormatContext->streams[i]->codec->codec_type == AVMEDIA_TYPE_AUDIO) {
-            libavlog("Audio Codec: %d channels, sample rate %d", pFormatContext->streams[i]->codec->channels, pFormatContext->streams[i]->codec->sample_rate);
+            libavlog("Video Codec: resolution %d x %d", pLocalCodecParameters->width, pLocalCodecParameters->height);
+        } else if (pLocalCodecParameters->codec_type == AVMEDIA_TYPE_AUDIO) {
+            libavlog("Audio Codec: %d channels, sample rate %d", pLocalCodecParameters->channels, pLocalCodecParameters->sample_rate);
         }
 
         // print its name, id and bitrate
-        libavlog("Codec %s ID %d bit_rate %lld", pLocalCodec->name, pLocalCodec->id, pFormatContext->streams[i]->codec->bit_rate);
+        libavlog("Codec %s ID %d bit_rate %lld", pLocalCodec->name, pLocalCodec->id, pLocalCodecParameters->bit_rate);
     }
 
     if (video_stream_index == -1) {
@@ -85,7 +85,7 @@ void VidConv::showVideoInfo(const char *input)
     }
 
 
-    libavlog("Cleaning memory\n");
+    libavlog("Cleaning memory");
 
     avformat_close_input(&pFormatContext);
     avformat_free_context(pFormatContext);

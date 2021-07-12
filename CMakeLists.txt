@@ -25,15 +25,20 @@ add_executable(FFMPEG IMPORTED)
 
 set(LIBAV_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs/libav)
 set(LIBAV ${LIBAV}
-    ${LIBAV_DIR}/avcodec.lib
-    ${LIBAV_DIR}/avdevice.lib
-    ${LIBAV_DIR}/avfilter.lib
-    ${LIBAV_DIR}/avformat.lib
-    ${LIBAV_DIR}/avresample.lib
-    ${LIBAV_DIR}/avutil.lib
+    ${LIBAV_DIR}/libavcodec.lib
+    ${LIBAV_DIR}/libavdevice.lib
+    ${LIBAV_DIR}/libavfilter.lib
+    ${LIBAV_DIR}/libavformat.lib
+    ${LIBAV_DIR}/libavresample.lib
+    ${LIBAV_DIR}/libswscale.lib
+    ${LIBAV_DIR}/libavutil.lib
+    "Ws2_32.lib"
+    "bcrypt.lib"
 )
 
 # ----- VIDCONVERTER -----#
+#set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
+
 set(SOURCES ${SOURCES} 
     ${IMGUI_SOURCES}
     vclib/files/files.cpp

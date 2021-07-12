@@ -113,12 +113,11 @@ std::string getInstallationPath(char* path)
 #pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
 #endif
 
-extern "C" {
-    #include <libavcodec/avcodec.h>
-}
-
 int main(int argc, char** argv)
 {
+    avcodec_register_all();
+    av_register_all();
+    
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())

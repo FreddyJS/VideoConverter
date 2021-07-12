@@ -24,6 +24,7 @@
 #include <stdarg.h>
 #include "avutil.h"
 #include "attributes.h"
+#include "version.h"
 
 /**
  * Describe the class of an AVClass context structure. That is an
@@ -144,6 +145,11 @@ typedef struct AVClass {
 #define AV_LOG_DEBUG    48
 
 /**
+ * Extremely verbose debugging, useful for libav* development.
+ */
+#define AV_LOG_TRACE    56
+
+/**
  * @}
  */
 
@@ -242,17 +248,6 @@ void av_log_default_callback(void *avcl, int level, const char *fmt,
  * @return The AVClass class_name
  */
 const char* av_default_item_name(void* ctx);
-
-/**
- * av_dlog macros
- * Useful to print debug messages that shouldn't get compiled in normally.
- */
-
-#ifdef DEBUG
-#    define av_dlog(pctx, ...) av_log(pctx, AV_LOG_DEBUG, __VA_ARGS__)
-#else
-#    define av_dlog(pctx, ...)
-#endif
 
 /**
  * Skip repeated messages, this requires the user app to use av_log() instead of

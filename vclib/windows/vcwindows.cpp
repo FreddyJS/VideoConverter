@@ -1,17 +1,34 @@
 #include <vcwindows.hpp>
 
+#include <libav_impl.hpp>
+#include <logs.hpp>
+
 static ImVec2 lastWindowSize(0.f, 0.f);
 
-void TextCenter(std::string text) {
+static void TextCenter(std::string text) {
     float font_size = ImGui::GetFontSize() * text.size() / 2;
     ImGui::SameLine(ImGui::GetWindowSize().x / 2 - (font_size / 2));
     ImGui::Text(text.c_str());
+}
+
+static void HelpMarker(const char* desc)
+{
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered())
+    {
+        ImGui::BeginTooltip();
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+        ImGui::TextUnformatted(desc);
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
 }
 
 void VidConv::initOpenGL()
 {
 
 }
+
 void VidConv::showInfoWindow(bool* dark_mode)
 {
     // Info window
@@ -40,6 +57,7 @@ void VidConv::showInfoWindow(bool* dark_mode)
     
     ImGui::End();
 }
+#define VC_ARRAYSIZE(_ARR)          ((int)(sizeof(_ARR) / sizeof(*(_ARR))))     // Size of a static C-style array. Don't use on pointers!
 
 void VidConv::showConvertWindow(LinkedList<vidFile>* fileList, std::string ffmpegFile)
 {
@@ -60,30 +78,77 @@ void VidConv::showConvertWindow(LinkedList<vidFile>* fileList, std::string ffmpe
     window_flags |= ImGuiWindowFlags_NoCollapse;
     window_flags |= ImGuiWindowFlags_NoMove;
 
-    ImGui::SetNextWindowFocus();
+    // If set it will close all combos so we will not have selectable options :(
+    //ImGui::SetNextWindowFocus();
 
     ImGui::Begin("Convert Window", NULL, window_flags);
-            
-    ImGui::Text("Total Files: %i", fileList->size);
-    ImGui::Text("File Name: %s", toConvert.name.c_str());
-    ImGui::Text("File Format: %s", toConvert.format.c_str());
+
+    // Maybe useless to print the no of files?      
+    //ImGui::Text("Total Files: %i", fileList->size);
+    ImGui::Text("Input Name: %s", toConvert.name.c_str());
+    ImGui::Text("Input Format: %s", toConvert.long_format.c_str());
+    ImGui::Text("Input Video Codec: %s", toConvert.videoCodecName.c_str());
+
+    if (toConvert.audioCodecId != AV_CODEC_ID_NONE)
+    {
+        ImGui::Text("Input Audio Codec: %s", toConvert.audioCodecName.c_str());
+    }
+
+    // Output Options
+    ImGui::NewLine();
+    ImGui::Text("Output Parameters");
+
+    static char outputName[128] = "";
+    ImGui::InputTextWithHint("Output Name", "File name", outputName, IM_ARRAYSIZE(outputName));
+    ImGui::SameLine(); HelpMarker("File of the new video generated.\nWithout any extension (NO video.mp4)");
+
+    static int item_current = 0;
+    ImGui::Combo("Output Format", &item_current, vc_supported_formats, IM_ARRAYSIZE(vc_supported_formats));
+    ImGui::SameLine(); HelpMarker("Select the output video extension (container)");
 
     ImGui::NewLine();
+    std::string convert_str = "Convert to " + std::string(vc_supported_formats[item_current]);
 
-    if(ImGui::Button("Convert to MP4"))
+    if(ImGui::Button(convert_str.c_str()))
     {
-        if (toConvert.format == "mov") {
-            std::string outfile = changeFileExtension(toConvert.path, "mp4");
+        // Not supporting yet just changes of codecs
+        if (strcmp(vc_supported_formats[item_current], toConvert.long_format.c_str()) != 0) 
+        {
+            std::string outfile;
+                
+            if (strlen(outputName) == 0) outfile = changeFileExtension(toConvert.path, vc_supported_formats[item_current]);
+            else outfile = getFolderFromPath(toConvert.path) + std::string(outputName) + "." + vc_supported_formats[item_current];
+
             std::string command = ffmpegFile + " -i " + toConvert.path + " -vcodec copy -acodec copy " + outfile;// + ">nul 2>nul";
-            std::cout << command << std::endl;
-
-            if (!fileExists(outfile))
+            vclog(VCLOGINFO, command.c_str());
+            
+            switch (toConvert.format)
             {
-                convertFileTo(toConvert, std::string("mp4"), ffmpegFile);
-            }   
+                case VC_FILEFORMAT_MOV:
+                {
+                    if (!VidConv::fileExists(outfile))
+                    {
+                        //convertFileTo(toConvert, std::string("mp4"), ffmpegFile);
+                        WinExec(command.c_str(), SW_HIDE);
+                    }
+                } break;
 
+                case VC_FILEFORMAT_MP4:
+                {
+                    if (!VidConv::fileExists(outfile))
+                    {
+                        //convertFileTo(toConvert, std::string("mp4"), ffmpegFile);
+                        WinExec(command.c_str(), SW_HIDE);
+                    }
+                } break;
+
+                default:
+                    break;
+            }
+            
             fileList->remove(0);
         }
+
     }
             
     ImGui::SameLine();
@@ -94,8 +159,10 @@ void VidConv::showConvertWindow(LinkedList<vidFile>* fileList, std::string ffmpe
     }
 
     lastWindowSize = ImGui::GetWindowSize();
+
     ImGui::End();
 }   
+
 void VidConv::showBackgroundWindow(GLuint bgimage)
 {
     // Set the window position

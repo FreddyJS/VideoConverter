@@ -41,6 +41,7 @@ set(LIBAV ${LIBAV}
 
 set(SOURCES ${SOURCES} 
     ${IMGUI_SOURCES}
+    vclib/logs/logs.cpp
     vclib/files/files.cpp
     vclib/files/images.cpp
     vclib/windows/vcwindows.cpp
@@ -70,10 +71,15 @@ if(UNIX)
 endif()
 
 # ----- RULES FOR CPACK -----#
-install(FILES ${FFMPEG_EXE} DESTINATION res)
-install(FILES ${CMAKE_SOURCE_DIR}/background.jpg DESTINATION res)
-install(TARGETS VideoConverter DESTINATION bin RENAME VideoConverter.exe)
+set(VC_RESOURCES ${VC_RESOURCES}
+    ${CMAKE_SOURCE_DIR}/res/background.jpg
+    ${CMAKE_SOURCE_DIR}/res/DroidSans.ttf
+)
 
+install(FILES ${VC_RESOURCES} DESTINATION res)
+install(FILES ${FFMPEG_EXE} DESTINATION res)
+
+install(TARGETS VideoConverter DESTINATION bin RENAME VideoConverter.exe)
 include(InstallRequiredSystemLibraries)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})

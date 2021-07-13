@@ -3,44 +3,14 @@
 // If you are new to Dear ImGui, read documentation from the docs/ folder + read the top of imgui.cpp.
 // Read online: https://github.com/ocornut/imgui/tree/master/docs
 
-#include <iostream>
-#include <stdio.h>
+#include <GL/gl3w.h>            // Initialize with gl3wInit()
+// Include glfw3.h after our OpenGL definitions
+#include <GLFW/glfw3.h>
 
+#include <SDL.h>
 #include <imgui_impl_opengl3.h>
 #include <imgui_impl_glfw.h>
 #include <imgui.h>
-#include <SDL.h>
-
-#if defined(IMGUI_IMPL_OPENGL_ES2)
-#include <GLES2/gl2.h>
-// About Desktop OpenGL function loaders:
-//  Modern desktop OpenGL doesn't have a standard portable header file to load OpenGL function pointers.
-//  Helper libraries are often used for this purpose! Here we are supporting a few common ones (gl3w, glew, glad).
-//  You may use another loader/header of your choice (glext, glLoadGen, etc.), or chose to manually implement your own.
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
-#include <GL/gl3w.h>            // Initialize with gl3wInit()
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
-#include <GL/glew.h>            // Initialize with glewInit()
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD)
-#include <glad/glad.h>          // Initialize with gladLoadGL()
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD2)
-#include <glad/gl.h>            // Initialize with gladLoadGL(...) or gladLoaderLoadGL()
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING2)
-#define GLFW_INCLUDE_NONE       // GLFW including OpenGL headers causes ambiguity or multiple definition errors.
-#include <glbinding/Binding.h>  // Initialize with glbinding::Binding::initialize()
-#include <glbinding/gl/gl.h>
-using namespace gl;
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING3)
-#define GLFW_INCLUDE_NONE       // GLFW including OpenGL headers causes ambiguity or multiple definition errors.
-#include <glbinding/glbinding.h>// Initialize with glbinding::initialize()
-#include <glbinding/gl/gl.h>
-using namespace gl;
-#else
-#include IMGUI_IMPL_OPENGL_LOADER_CUSTOM
-#endif
-
-// Include glfw3.h after our OpenGL definitions
-#include <GLFW/glfw3.h>
 
 // [Win32] Our example includes a copy of glfw3.lib pre-compiled with VS2010 to maximize ease of testing and compatibility with old VS compilers.
 // To link with VS2010-era libraries, VS2015+ requires linking with legacy_stdio_definitions.lib, which we do using this pragma.
@@ -49,32 +19,26 @@ using namespace gl;
 #pragma comment(lib, "legacy_stdio_definitions")
 #endif
 
-#define STB_IMAGE_IMPLEMENTATION
-#include <images.hpp>
+#ifndef DEBUG_MODE
+#pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
+#endif
 
 // Here we add our includes
 #include <vcwindows.hpp>
 #include <LinkedList.hpp>
 #include <files.hpp>
+#include <logs.hpp>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <images.hpp>
 
 #include <libav_impl.hpp>
 
-LinkedList<vidFile>* fileList = new LinkedList<vidFile>();
+LinkedList<videoFile>* fileList = new LinkedList<videoFile>();
 
 static void glfw_error_callback(int error, const char* description)
 {
-    fprintf(stderr, "glfw error %d: %s\n", error, description);
-}
-
-void debug_list()
-{
-    std::cout << "\n----- LIST DEBUG -----\n";
-    std::cout << "Current: " << fileList->current << " - Items: " << fileList->size << std::endl;
-    for(int i = 0; i < fileList->size; i++)
-    {
-        std::cout << "Ptr: " << fileList->getItemPtr(i) << " - Name: " << fileList->get(i).name << " - Ext: " << fileList->get(i).format << std::endl;
-    }
-    std::cout << "----- END DEBUG -----\n\n";
+    vclog(VCLOGERROR, "glfw error %d: %s\n", error, description);
 }
 
 void drop_callback(GLFWwindow* window, int count, const char** paths)
@@ -82,17 +46,18 @@ void drop_callback(GLFWwindow* window, int count, const char** paths)
     int i;
     for (i = 0;  i < count;  i++)
     {
-        struct vidFile droped;
+        videoFile droped;
         std::string file(paths[i]);
 
-        fillFileInfo(&droped, file);
-        std::cout << "Dropped File: " << droped.path << " - " << droped.name << " - " << droped.format << "\n";
-        
-        VidConv::showVideoInfo(file.c_str());
+        bool valid = VidConv::fillFileInfo(&droped, file);
+        vclog(VCLOGINFO, "Dropped File: %s", droped.path.c_str());
 
-        if (droped.format != "mov" && droped.format != "mp4")
+        // Should go after the if !valid but i dont support other files than mov
+        //VidConv::showVideoInfo(file.c_str());
+
+        if (!valid)
         {
-            std::cout << "Not supported file: " << droped.name << std::endl;
+            vclog(VCLOGWARNING, "Not supported file: %s", droped.name.c_str());
             continue;
         }
 
@@ -103,15 +68,11 @@ void drop_callback(GLFWwindow* window, int count, const char** paths)
 std::string getInstallationPath(char* path)
 {
     std::string launchPath(path);
-    std::string install_dir = getFolderFromPath(launchPath);
+    std::string install_dir = VidConv::getFolderFromPath(launchPath);
     install_dir = install_dir.substr(0, install_dir.length() -1);
 
-    return getFolderFromPath(install_dir.c_str());
+    return VidConv::getFolderFromPath(install_dir.c_str());
 }
-
-#ifndef DEBUG_MODE
-#pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
-#endif
 
 int main(int argc, char** argv)
 {
@@ -123,69 +84,41 @@ int main(int argc, char** argv)
     if (!glfwInit())
         return 1;
 
-    // Decide GL+GLSL versions
-#if defined(IMGUI_IMPL_OPENGL_ES2)
-    // GL ES 2.0 + GLSL 100
-    const char* glsl_version = "#version 100";
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
-#elif defined(__APPLE__)
-    // GL 3.2 + GLSL 150
-    const char* glsl_version = "#version 150";
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // Required on Mac
-#else
     // GL 3.0 + GLSL 130
     const char* glsl_version = "#version 130";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
     //glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
     //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
-#endif
 
     // Create window with graphics context
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
     GLFWwindow* window = glfwCreateWindow(640, 360, "VidConverter ImGUI GLFW+OpenGL3", NULL, NULL);
+
     if (window == NULL)
         return 1;
+
     glfwMakeContextCurrent(window);
     glfwSetDropCallback(window, drop_callback);
     glfwSwapInterval(1); // Enable vsync
 
     // Initialize OpenGL loader
-#if defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
     bool err = gl3wInit() != 0;
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
-    bool err = glewInit() != GLEW_OK;
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD)
-    bool err = gladLoadGL() == 0;
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD2)
-    bool err = gladLoadGL(glfwGetProcAddress) == 0; // glad2 recommend using the windowing library loader instead of the (optionally) bundled one.
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING2)
-    bool err = false;
-    glbinding::Binding::initialize();
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING3)
-    bool err = false;
-    glbinding::initialize([](const char* name) { return (glbinding::ProcAddress)glfwGetProcAddress(name); });
-#else
-    bool err = false; // If you use IMGUI_IMPL_OPENGL_LOADER_CUSTOM, your loader is likely to requires some form of initialization.
-#endif
+
     if (err)
     {
-        fprintf(stderr, "Failed to initialize OpenGL loader!\n");
+        vclog(VCLOGERROR, "Failed to initialize OpenGL loader!\n");
         return 1;
     }
 
     // Setup Dear ImGui context
     std::string installDir = getInstallationPath(argv[0]);
-    std::cout << "\n---- VideoConverter v0.1.0 Initialized ----\n" << "Installation Directory: " << installDir << std::endl;
+    vclog(VCLOGINFO, "---- VideoConverter v0.1.0 Initialized ----");
+    vclog(VCLOGINFO, "Installation Directory: %s", installDir.c_str());
 
     IMGUI_CHECKVERSION();
     ImGuiContext* imguictx = ImGui::CreateContext();
-    std::cout << "Created imgui context " << imguictx << std::endl;
+    vclog(VCLOGINFO, "Created imgui context %p" , imguictx);
 
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
@@ -193,26 +126,13 @@ int main(int argc, char** argv)
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
-    //ImGui::StyleColorsClassic();
 
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
-    
-    // Load Fonts
-    // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
-    // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
-    // - If the file cannot be loaded, the function will return NULL. Please handle those errors in your application (e.g. use an assertion, or display an error and quit).
-    // - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
-    // - Read 'docs/FONTS.md' for more instructions and details.
-    // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
-    //io.Fonts->AddFontDefault();
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf", 16.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/ProggyTiny.ttf", 10.0f);
-    //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, NULL, io.Fonts->GetGlyphRangesJapanese());
-    //IM_ASSERT(font != NULL);
+
+    std::string fontFile = installDir + std::string("res/DroidSans.ttf");
+    io.Fonts->AddFontFromFileTTF(fontFile.c_str(), 18.0f);
 
     // Our state
     bool dark_mode = true;
@@ -224,12 +144,9 @@ int main(int argc, char** argv)
     GLuint my_image_texture = 0;
 
     std::string bgfile = installDir + "res/background.jpg";
-    std::string ffmpegFile = "\"" + installDir + "res/ffmpeg.exe\"";
+    std::string ffmpegFile = installDir + "res/ffmpeg.exe";
     bool ret = LoadTextureFromFile(bgfile.c_str(), &my_image_texture, &my_image_width, &my_image_height);
     IM_ASSERT(ret);
-
-    //Hide the console
-    //ShowWindow(::GetConsoleWindow(), SW_HIDE);
 
     static ImVec2 lastWindowSize(0.f, 0.f);
 
@@ -246,6 +163,7 @@ int main(int argc, char** argv)
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
+        ImGui::ShowDemoWindow();
         
         // Switch theme mode
         if(dark_mode)
